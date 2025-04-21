@@ -298,7 +298,7 @@ class WindowManager:
         self.port_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # 测试连接按钮放在同一行
-        btn_test = ModernButton(port_frame, text='测试连接',
+        btn_test = ModernButton(port_frame, text='手动测试',
                                 command=self.test_adb_connection)
         btn_test.pack(side=tk.LEFT, padx=5)
 
@@ -313,17 +313,10 @@ class WindowManager:
         self.entry_emu_path.insert(0, self.emulator_path)
         self.entry_emu_path.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
-        btn_browse = ModernButton(
-            path_frame, text='浏览', command=self.browse_emulator_path)
-        btn_browse.pack(side=tk.LEFT, padx=5)
-
-        # 执行ADB复制按钮单独一行
-        btn_frame = ttk.Frame(self.adb_frame)
-        btn_frame.pack(fill=tk.X, pady=5)
-
-        btn_pull = ModernButton(btn_frame, text='执行ADB复制', command=lambda: Thread(
+        # 执行ADB复制按钮
+        btn_pull = ModernButton(path_frame, text='执行ADB复制', command=lambda: Thread(
             target=self.adb_pull_and_process).start())
-        btn_pull.pack(fill=tk.X, padx=5)
+        btn_pull.pack(side=tk.LEFT, padx=5)
 
         # 输出路径配置
         output_frame = ModernLabelFrame(self.main_container, text="输出配置")
@@ -378,7 +371,7 @@ class WindowManager:
 
         # 检查端口是否为纯数字
         if not port.isdigit():
-            messagebox.showerror("错误", "端口号必须为纯数字")
+            self.show_error_message("错误", "端口号必须为纯数字")
             return
 
         self.adb_port = port
@@ -491,6 +484,57 @@ class WindowManager:
 
         with open(self.config_file, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
+
+    def show_error_message(self, title, message):
+        """显示自定义错误消息框，以主窗口为中心"""
+        error_dialog = tk.Toplevel(self.root)
+        error_dialog.title(title)
+        error_dialog.resizable(False, False)
+        error_dialog.transient(self.root)
+        error_dialog.grab_set()
+
+        # 设置窗口图标
+        try:
+            error_dialog.iconbitmap('app_icon.ico')
+        except tk.TclError:
+            pass
+
+        # 主容器
+        main_frame = ttk.Frame(error_dialog, padding=0)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 内容框架
+        content_frame = ttk.Frame(main_frame, padding=15)
+        content_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 消息文本
+        message_label = ttk.Label(
+            content_frame, 
+            text=message, 
+            style='Modern.TLabel',
+            font=('微软雅黑', 12, 'bold'),
+            wraplength=300,
+            justify=tk.LEFT
+        )
+        message_label.pack(pady=8)
+
+        # 按钮框架
+        btn_frame = ttk.Frame(content_frame)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(15, 15))
+
+        # 确定按钮
+        btn_ok = ModernButton(
+            btn_frame,
+            text="确定",
+            command=error_dialog.destroy,
+            padding=4
+        )
+        btn_ok.pack(pady=0, ipadx=10)
+
+        # 窗口居中
+        self.center_window_on_parent(error_dialog, 300, 140)
+        error_dialog.wait_visibility()
+        error_dialog.focus_set()
 
     def open_config_dialog(self):
         """打开配置对话框"""
@@ -626,16 +670,25 @@ class WindowManager:
 
             # 实时更新进度
             progress = 20
-            for line in iter(process.stdout.readline, ''):
-                self.update_status(line.strip())
-                logging.info(line.strip())
+            # Bug修复：检查 process.stdout 是否为 None
+            if process.stdout is not None:
+                for line in iter(process.stdout.readline, ''):
+                    self.update_status(line.strip())
+                    logging.info(line.strip())
 
+                    # 模拟进度更新
+                    progress = min(progress + 5, 90)
+                    self.update_progress(progress)
                 # 模拟进度更新
                 progress = min(progress + 5, 90)
                 self.update_progress(progress)
 
             process.wait()
-            output = process.stdout.read() or ''
+            # Bug修复：检查 process.stdout 是否为 None
+            if process.stdout is not None:
+                output = process.stdout.read() or ''
+            else:
+                output = ''
 
             if process.returncode == 0 and '0 skipped' in output:
                 magazine_id = os.path.basename(

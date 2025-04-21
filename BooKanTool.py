@@ -6,8 +6,8 @@
 主要功能包括ADB连接、文件传输、图片重命名和PDF生成。
 
 作者: Mumei
-版本: 1.0
-日期: 2025-03-26
+版本: 1.1
+日期: 2025-04-21
 
 """
 
@@ -378,7 +378,7 @@ class WindowManager:
         self.save_preferences()
         Thread(target=self.adb_connect).start()
 
-    def on_port_selected(self, event=None):
+    def on_port_selected(self):
         """端口选择事件处理"""
         selected = self.port_combo.get()
         port_value = selected.split('-')[-1] if '-' in selected else selected
@@ -391,7 +391,7 @@ class WindowManager:
             # 自动测试连接
             Thread(target=self.adb_connect).start()
 
-    def on_port_focus_out(self, event=None):
+    def on_port_focus_out(self):
         """端口输入框失去焦点事件处理"""
         port = self.port_combo.get()
 
@@ -509,8 +509,8 @@ class WindowManager:
 
         # 消息文本
         message_label = ttk.Label(
-            content_frame, 
-            text=message, 
+            content_frame,
+            text=message,
             style='Modern.TLabel',
             font=('微软雅黑', 12, 'bold'),
             wraplength=300,
@@ -776,9 +776,6 @@ def main_processor(source_dir, target_dir, magazine_id):
 
     # 二次路径验证
     if not os.path.exists(img_folder):
-        source_dir = config.get('LOCAL', 'default_mumu_source',
-                                fallback=os.path.join(os.path.expanduser('~'),
-                                                      'Mumu共享文件夹'))
         img_folder = os.path.join(source_dir, magazine_id)
 
     txt_path = os.path.join(source_dir, f'{magazine_id}.txt')
@@ -800,8 +797,17 @@ def main_processor(source_dir, target_dir, magazine_id):
             os.rename(orig_path, new_path)
             renamed_files.append(new_path)
 
-    # 合成PDF
-    pdf_path = os.path.join(target_dir, f"{magazine_id}.pdf")
+    # 创建数字命名的子文件夹
+    output_folder = os.path.join(target_dir, magazine_id)
+    os.makedirs(output_folder, exist_ok=True)
+
+    # 复制封面图片(001.jpg)到目标文件夹
+    cover_path = os.path.join(source_dir, magazine_id, "0001.jpg")
+    if os.path.exists(cover_path):
+        shutil.copy2(cover_path, os.path.join(output_folder, "cover.jpg"))
+
+    # 合成PDF并保存到子文件夹
+    pdf_path = os.path.join(output_folder, f"{magazine_id}.pdf")
     with open(pdf_path, "wb") as pdf_file:
         pdf_file.write(img2pdf.convert(sorted(renamed_files)))
 

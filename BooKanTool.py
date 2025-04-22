@@ -7,7 +7,7 @@
 
 作者: Mumei
 版本: 1.1
-日期: 2025-04-21
+日期: 2025-04-22
 
 """
 
@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import time
+import threading
 import tkinter as tk
 from tkinter import filedialog, ttk
 from tkinter import messagebox
@@ -171,7 +172,10 @@ class WindowManager:
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title('图书PDF生成工具 v1.0')
+        self.root.title('图书PDF生成工具 v1.1')
+
+        # 线程终止标志
+        self.should_exit = False
 
         # 配置全局样式
         configure_styles()
@@ -275,7 +279,7 @@ class WindowManager:
         btn_config.pack(side=tk.LEFT, padx=5, expand=True, fill=tk.X)
 
         btn_quit = ModernButton(
-            self.button_frame, text='退出程序', command=self.root.quit)
+            self.button_frame, text='退出程序', command=self.on_close)
         btn_quit.pack(side=tk.LEFT, padx=5, expand=True, fill=tk.X)
 
         # ADB配置框架
@@ -298,7 +302,7 @@ class WindowManager:
         self.port_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # 测试连接按钮放在同一行
-        btn_test = ModernButton(port_frame, text='手动测试',
+        btn_test = ModernButton(port_frame, text='测试连接',
                                 command=self.test_adb_connection)
         btn_test.pack(side=tk.LEFT, padx=5)
 
@@ -360,9 +364,30 @@ class WindowManager:
 
     def on_close(self):
         """窗口关闭事件处理"""
+        # 设置终止标志
+        self.should_exit = True
+
         # 保存窗口几何信息
         self.save_preferences()
-        self.root.quit()
+
+        # 强制终止所有后台线程
+        for thread in threading.enumerate():
+            if thread != threading.current_thread():
+                if hasattr(thread, 'stop'):
+                    thread.stop()
+                elif hasattr(thread, 'join'):
+                    thread.join(timeout=0.1)
+                else:
+                    thread.join(timeout=0.1)
+
+        # 立即退出主循环并销毁窗口
+        try:
+            self.root.quit()
+            self.root.destroy()
+        except (RuntimeError, tk.TclError, OSError) as e:
+            print(f'退出或销毁窗口时出错: {e}')
+        finally:
+            os._exit(0)
 
     def test_adb_connection(self):
         """测试ADB连接"""
@@ -378,8 +403,12 @@ class WindowManager:
         self.save_preferences()
         Thread(target=self.adb_connect).start()
 
-    def on_port_selected(self):
+    def on_port_selected(self, event=None):
         """端口选择事件处理"""
+        # 仅响应组合框选择事件
+        if not event:
+            return
+
         selected = self.port_combo.get()
         port_value = selected.split('-')[-1] if '-' in selected else selected
 
@@ -391,7 +420,7 @@ class WindowManager:
             # 自动测试连接
             Thread(target=self.adb_connect).start()
 
-    def on_port_focus_out(self):
+    def on_port_focus_out(self, event=None):
         """端口输入框失去焦点事件处理"""
         port = self.port_combo.get()
 
@@ -409,7 +438,6 @@ class WindowManager:
         if port.isdigit():
             self.adb_port = port
             self.save_preferences()
-            Thread(target=self.adb_connect).start()
 
     def adb_pull_and_process(self):
         """执行ADB复制并自动处理文件"""
@@ -601,20 +629,28 @@ class WindowManager:
         self.update_status("配置已保存")
 
     def update_status(self, message):
-        """更新状态栏"""
-        if self.status_bar:
-            self.status_bar.config(text=message)
-        self.root.update_idletasks()
+        """更新状态栏(线程安全)"""
+        try:
+            if hasattr(self, 'root') and self.root and self.root.winfo_exists() and self.status_bar:
+                self.root.after(0, lambda: self.status_bar.config(text=message))
+        except RuntimeError:  # 主线程不在主循环时跳过
+            pass
 
     def update_progress(self, value):
-        """更新进度条"""
-        if self.progress_bar:
-            self.progress_bar['value'] = value
-        self.root.update_idletasks()
+        """更新进度条(线程安全)"""
+        try:
+            if hasattr(self, 'root') and self.root and self.root.winfo_exists() and self.progress_bar:
+                self.root.after(0, lambda: self.progress_bar.configure(value=value))
+        except RuntimeError:  # 主线程不在主循环时跳过
+            pass
 
     def adb_connect(self):
         """建立ADB连接"""
         try:
+            # 检查终止标志
+            if self.should_exit:
+                return
+
             self.update_status("正在连接ADB...")
             self.update_progress(30)
 
@@ -644,7 +680,11 @@ class WindowManager:
             self.update_status(f'连接错误: {str(e)}')
             self.update_progress(0)
         finally:
-            self.root.after(2000, lambda: self.update_progress(0))
+            try:
+                if hasattr(self, 'root') and self.root.winfo_exists() and threading.current_thread() is not threading.main_thread():
+                    self.root.after(2000, lambda: self.update_progress(0))
+            except RuntimeError:
+                pass
 
     def adb_pull(self):
         """执行ADB文件拉取"""
@@ -703,7 +743,11 @@ class WindowManager:
             self.update_progress(0)
             logging.error('ADB操作失败: %s', str(e))
         finally:
-            self.root.after(2000, lambda: self.update_progress(0))
+            try:
+                if hasattr(self, 'root') and self.root.winfo_exists() and threading.current_thread() is not threading.main_thread():
+                    self.root.after(2000, lambda: self.update_progress(0))
+            except RuntimeError:
+                pass
 
     def process_all(self):
         """处理所有文件"""

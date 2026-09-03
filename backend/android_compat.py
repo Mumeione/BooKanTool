@@ -148,9 +148,8 @@ class AndroidBridge(BridgeAPI):
     """仅覆盖 Android 后端不支持的桌面交互；js_api 通道全部复用。
 
     事件推送：BridgeAPI 默认用 evaluate_js，但其 Android 实现经 pyjnius
-    （@run_on_ui_thread），从后台任务线程调用会触发 native 崩溃
-    （tombstone 实锤：SIGSEGV / CheckJNI abort）。改为事件入队 +
-    前端定时调 pull_events() 拉取（js_api 方向从 Java 线程进入
+    （@run_on_ui_thread），从后台任务线程调用存在线程安全问题。改为事件
+    入队 + 前端定时调 pull_events() 拉取（js_api 方向从 Java 线程进入
     Python，安全且已在解析/配置等调用中验证）。
     """
 

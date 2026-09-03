@@ -18,6 +18,7 @@ import argparse
 import contextlib
 import os
 import sys
+import threading
 import traceback
 
 APP_NAME = "BookanTool"
@@ -569,6 +570,61 @@ def heal_webview_timers() -> None:
         pass
 
 
+def patch_android_evaluate_js() -> None:
+    """
+    修复 js_api 回传路径的 pyjnius 线程安全问题（多任务并发时闪退）。
+
+    pywebview 的 js_api 调度（webview/util.py js_bridge_call）每次都新建一个
+    Python 线程执行方法，方法返回值经 window.evaluate_js 送回 JS；安卓实现
+    （@run_on_ui_thread 装饰器）会运行时创建 JNI 代理（Runnable /
+    ValueCallback）。前端 1.5s 轮询 pull_events 与 start_task 等调用叠加时，
+    多个线程并发创建 JNI 代理存在竞态，可导致 native 崩溃。
+
+    对策：把全部 evaluate_js 引流到单一常驻 worker 线程串行执行——
+    JNIEnv 仅 attach 一次、JNI 代理创建完全互斥，从根上消除竞态。
+    原实现内部会把真正的 JS 执行投递到 UI 线程并阻塞等回调，worker 只做
+    提交与等待，不触碰 UI 对象；返回值语义不变（阻塞至 JS 执行完毕）。
+    events.loaded 在 pywebview 的注入线程触发而非 UI 线程（6.2.1 源码
+    inject_pywebview 实证），因此 on_loaded 走队列不会造成 UI 线程自等待死锁。
+    """
+    import queue as _queue
+
+    import webview.platforms.android as _gui
+
+    orig_evaluate_js = _gui.evaluate_js
+    jobs: _queue.Queue = _queue.Queue()
+    start_lock = threading.Lock()
+    worker_started = False
+
+    def _worker() -> None:
+        while True:
+            js_code, box, done = jobs.get()
+            if done is None:  # 停机哨兵
+                return
+            try:
+                box.append(orig_evaluate_js(js_code, None))
+            except Exception:
+                box.append(None)  # 回传失败静默：与原实现的 suppress 语义一致
+            finally:
+                done.set()
+
+    def evaluate_js(js_code, _window=None, parse_json=True):
+        nonlocal worker_started
+        box: list = []
+        done = threading.Event()
+        with start_lock:
+            if not worker_started:
+                worker_started = True
+                threading.Thread(
+                    target=_worker, name="bookan-jsbridge", daemon=True
+                ).start()
+        jobs.put((js_code, box, done))
+        done.wait()
+        return box[0] if box else None
+
+    _gui.evaluate_js = evaluate_js
+
+
 def patch_android_lifecycle() -> None:
     """
     修复 pywebview 6.x Android 后端在真机上的生命周期缺陷。
@@ -585,25 +641,18 @@ def patch_android_lifecycle() -> None:
       • on_pause 只做实例级 onPause()，不再调用全局 pauseTimers()——
         全局冻结是「强杀重启卡握手」死局的根源（见 heal_webview_timers）；
         后台 CPU 由前端 document.hidden 守卫接管（1.5s 空转轮询开销可忽略）；
-      • on_resume 仍无条件 resumeTimers() 兜底解冻（幂等 no-op），并经
-        run_on_ui_thread 派发 app_resumed 事件（fire-and-forget，不走
-        evaluate_js 的锁等待，避免 UI 线程自等待死锁）——前端收到后立即
-        补发握手，不依赖 setTimeout，冻结态下事件路径也能自愈；
+      • on_resume 仍无条件 resumeTimers() 兜底解冻（幂等 no-op），并直接
+        evaluateJavascript 派发 app_resumed 事件（回调已在 UI 线程，
+        fire-and-forget，不走 evaluate_js 的锁等待，避免 UI 线程自等待
+        死锁）——前端收到后立即补发握手，不依赖 setTimeout，冻结态下
+        事件路径也能自愈；
       • on_destroy 一律 os._exit(0)：p4a 进程存活时 Activity 重建不会
         重跑 Python，新 WebView 没有 js_api 桥必成死局，进程退出后由
         系统重建即全新启动。
     """
     import os as _os
 
-    from android.runnable import run_on_ui_thread
     from webview.platforms.android import AndroidApp
-
-    @run_on_ui_thread
-    def _dispatch_app_resumed(wv):
-        wv.evaluateJavascript(
-            "window.__bookan_dispatch && window.__bookan_dispatch('app_resumed', {})",
-            None,
-        )
 
     def on_pause(self, _activity):
         try:
@@ -620,7 +669,12 @@ def patch_android_lifecycle() -> None:
             if wv is not None:
                 wv.onResume()
                 wv.resumeTimers()  # 全局解冻，即使 WebView 被系统重建过
-                _dispatch_app_resumed(wv)  # 前端立即补发握手（事件路径）
+                # 生命周期回调本就跑在 UI 线程，直接调用即可——
+                # 不再包 run_on_ui_thread，省一次 JNI 代理创建
+                wv.evaluateJavascript(
+                    "window.__bookan_dispatch && window.__bookan_dispatch('app_resumed', {})",
+                    None,
+                )
         except Exception:
             pass
 
@@ -690,6 +744,7 @@ def main() -> None:
     from backend.config import APP_VERSION, load_config, update_config
 
     if android:
+        patch_android_evaluate_js()  # js_api 回传串行化：消除 pyjnius 竞态崩溃
         patch_android_lifecycle()
 
     # ── 定位前端资源 ──
@@ -760,9 +815,9 @@ def main() -> None:
     icon_path = resource_path(os.path.join("assets", "icon.ico"))
 
     # 页面加载完成后注入事件分发函数 + 配置与默认输出目录
-    # （此回调跑在主线程，evaluate_js 安全；任务事件的持续推送则由
-    #   AndroidBridge._emit 的事件队列 + 前端轮询 pull_events 完成，
-    #   因为后台线程调 evaluate_js 会经 pyjnius 触发 native 崩溃）
+    # （events.loaded 由 pywebview 注入线程触发，不在 UI 线程；此处的
+    #   pyjnius 调用不创建 JNI 代理、且全局只有这一处，实测安全；任务事件
+    #   的持续推送则由 AndroidBridge._emit 的事件队列 + 前端轮询完成）
     def on_loaded():
         if android:
             heal_webview_timers()  # 启动安全阀：治愈启动窗口期的 timers 冻结

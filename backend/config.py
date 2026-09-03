@@ -14,7 +14,7 @@ import time
 
 # ────────────── 应用信息 ──────────────
 # 版本号双轨：安卓独立从 1.0.0 起版，不与 PC 同步
-APP_VERSION = "1.0.0" if "ANDROID_ARGUMENT" in os.environ else "2.1.0"
+APP_VERSION = "1.0.1" if "ANDROID_ARGUMENT" in os.environ else "2.1.0"
 
 # ────────────── API 端点常量 ──────────────
 API_BASE = "https://api.bookan.com.cn"

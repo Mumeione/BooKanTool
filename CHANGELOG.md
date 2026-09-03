@@ -3,6 +3,13 @@
 所有显著变更记录在本文件。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；版本号唯一来源：`backend/config.py` 的 `APP_VERSION`——PC 端 2.x 与安卓端 1.x 各自独立，按 `ANDROID_ARGUMENT` 环境变量区分。
 
+## [1.0.1] Android - 2026-09-03
+
+### 修复
+
+- **多任务并发下载闪退**：js_api 回传路径（pywebview 安卓后端）每次调用都在独立线程运行时创建 JNI 代理，前端轮询与任务启动叠加时并发创建代理存在竞态，可触发原生崩溃。现将全部 `evaluate_js` 回传引流到单一常驻 worker 线程串行执行（JNI 代理创建完全互斥），9 本书连续下载实测无闪退
+- **回前台事件派发收紧**：`on_resume` 生命周期回调本就运行在 UI 线程，改为直接调用 `evaluateJavascript` 派发 `app_resumed`，省去一次冗余 JNI 代理创建
+
 ## [1.0.0] Android - 2026-09-03
 
 首个安卓正式版（签名 release 包 `bookantool-1.0.0-arm64-v8a-release.apk`）。与 PC 端 2.1.0 共享同一套源码与前后端桥接，版本号独立管理。

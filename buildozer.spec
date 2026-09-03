@@ -17,7 +17,7 @@ title = BookanTool
 package.name = bookantool
 package.domain = com.mumeione
 source.dir = .
-version = 1.0.0
+version = 1.0.1
 
 # 前端静态资源与后端 Python 一并打包
 source.include_exts = py,png,jpg,css,js,html

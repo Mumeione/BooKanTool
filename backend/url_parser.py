@@ -1,8 +1,8 @@
 """
-URL 解析器：兼容多种输入形式
+URL 解析器：输入仅支持完整链接
   • 博看官网完整 URL: https://new.bookan.com.cn/...?type=1&id=233832
-  • 纯 ID:             233832
-  • 自定义格式前缀:    id:233832 / mag:233832 / book:233832
+  • 移动端分享链接:   https://wk6.bookan.com.cn/?id=130#/dt/1/310823891
+  • 含 path 的链接:   https://new.bookan.com.cn/read/1/233832
 最终输出 (resource_type, issue_id) 二元组。
 """
 
@@ -16,12 +16,12 @@ _URL_PARAM_RE = re.compile(r"[?&](type|id)=([^&]*)")
 
 
 class ParseError(ValueError):
-    """URL/ID 解析失败时抛出。"""
+    """链接解析失败时抛出。"""
 
 
 def parse_input(text: str) -> tuple[int, str]:
     """
-    统一解析入口。
+    统一解析入口（仅接受完整链接，纯 ID / 前缀缩写已移除）。
     返回 (resource_type, issue_id)；
       • resource_type: 1=杂志 3=书籍
       • issue_id: 字符串（接口接受字符串）
@@ -33,13 +33,15 @@ def parse_input(text: str) -> tuple[int, str]:
     if not raw:
         raise ParseError("输入为空")
 
-    # 1) 自定义前缀：mag: / book: / id:
-    pref_match = re.match(r"^(mag|magazine|book|id)\s*[:=]\s*([\w\-]+)$", raw, re.I)
-    if pref_match:
-        kind = pref_match.group(1).lower()
-        value = pref_match.group(2)
-        kind_map = {"mag": 1, "magazine": 1, "book": 3, "id": 1}
-        return kind_map[kind], value
+    # 1) 移动端分享链接（App 复制）：https://wk6.bookan.com.cn/?id=130#/dt/1/310823891
+    #    fragment 格式 #/dt/{type}/{issueId}；查询串 ?id=130 是站点 ID 而非书刊 ID，
+    #    必须先于查询参数解析，否则 130 会被误当 issueId
+    share_match = re.search(r"#/dt/(\d+)/(\d+)", raw)
+    if share_match:
+        t = int(share_match.group(1))
+        if t not in (1, 3):
+            raise ParseError(f"无法识别的 type={t}，仅支持 1(杂志) / 3(书籍)")
+        return t, share_match.group(2)
 
     # 2) 含 type / id 查询参数（任意 URL）
     type_value: str | None = None
@@ -65,11 +67,7 @@ def parse_input(text: str) -> tuple[int, str]:
             if t in (1, 3):
                 return t, i
 
-    # 4) 退化：纯数字当杂志 ID 处理
-    if re.fullmatch(r"\d{3,}", raw):
-        return 1, raw
-
-    raise ParseError(f"无法解析输入：{raw!r}")
+    raise ParseError(f"无法识别的链接，请粘贴完整的书刊详情页网址：{raw!r}")
 
 
 def describe_type(resource_type: int) -> str:

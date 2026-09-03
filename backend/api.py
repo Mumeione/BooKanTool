@@ -383,7 +383,7 @@ def _parse_issue(raw: dict, default_resource_type: int) -> IssueInfo:
       出版日  pub_date  ← publish      （不是 pubDate / publishDate）
       简介    description ← text       （不是 description / intro）
       CDN节点 jpage_node ← jpg or webp （接口直接给出，无需探测）
-      作者    author ← 接口不返回该字段，保持空串
+      作者    author ← owner          （type=3 图书实测返回；author 字段接口不返回）
       封面    cover_url ← 接口不返回，由第 1 页缩略图拼装（需 hash，见 ImagePipeline）
     """
     consumed = {
@@ -395,6 +395,7 @@ def _parse_issue(raw: dict, default_resource_type: int) -> IssueInfo:
         "type",
         "count",
         "author",
+        "owner",
         "press",
         "publish",
         "isbn",
@@ -432,7 +433,7 @@ def _parse_issue(raw: dict, default_resource_type: int) -> IssueInfo:
         issue_name=str(raw.get("issueName") or ""),
         resource_type=int(raw.get("resourceType") or raw.get("type") or default_resource_type),
         count=_to_int(raw.get("count"), 0),
-        author=str(raw.get("author") or ""),
+        author=str(raw.get("owner") or raw.get("author") or ""),
         publisher=str(raw.get("press") or ""),
         pub_date=str(raw.get("publish") or ""),
         isbn=str(raw.get("isbn") or ""),

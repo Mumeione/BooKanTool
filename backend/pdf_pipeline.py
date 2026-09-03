@@ -12,12 +12,15 @@ PDF 合成 + 目录书签（基于 pypdf + img2pdf）。
 from __future__ import annotations
 
 import bisect
+import contextlib
 import io
 import os
 from collections.abc import Callable
+from datetime import datetime
 
 import img2pdf
 from pypdf import PdfReader, PdfWriter
+from pypdf.xmp import XmpInformation
 
 from .models import ChapterStart, IssueInfo
 
@@ -59,17 +62,19 @@ def build_pdf(
         page_numbers = list(range(1, len(image_paths) + 1))
 
     # 1) img2pdf 拼图片
-    phase(0.70, f"合成图片版 PDF（共 {len(image_paths)} 页）…")
+    phase(0.92, f"合成图片版 PDF（共 {len(image_paths)} 页）…")
     log(f"合成图片版 PDF，共 {len(image_paths)} 页…")
     img2pdf_kwargs = _img2pdf_kwargs()
     raw_pdf_bytes = img2pdf.convert(image_paths, **img2pdf_kwargs)
     log(f"  临时 PDF 字节数：{len(raw_pdf_bytes) / 1024:.1f} KB")
 
     # 2) pypdf 加 outline + metadata
-    phase(0.82, "写入书签与元数据…")
+    phase(0.95, "写入书签与元数据…")
     log("写入书签与元数据…")
     reader = PdfReader(io.BytesIO(raw_pdf_bytes))
     writer = PdfWriter(clone_from=reader)
+    # 临时 PDF 字节串（百 MB 级）已拷入 writer，立即释放，降低多本连下时的内存峰值
+    del raw_pdf_bytes, reader
 
     if chapters:
         n = _add_outline(writer, chapters, page_numbers, page_offset)
@@ -78,12 +83,12 @@ def build_pdf(
     _set_metadata(writer, issue)
 
     # 3) 写盘
-    phase(0.90, "保存 PDF 文件…")
+    phase(0.97, "保存 PDF 文件…")
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "wb") as f:
         writer.write(f)
 
-    phase(0.97, "PDF 完成")
+    phase(0.99, "PDF 完成")
     log(f"PDF 已保存：{output_path}")
     return output_path
 
@@ -155,20 +160,32 @@ def _add_outline(
 
 def _set_metadata(writer, issue: IssueInfo) -> None:
     try:
-        # 期刊展示出版社，图书展示作者；作者字段接口常为空，回退出版社。
+        # 图书作者取 owner（2026-09 实测字段）；作者缺失时回退出版社。
         author = issue.author or issue.publisher or "Unknown"
-        subject = "Bookan Magazine"
+        # 出版社 / 出版日期 / ISBN（期刊为 ISSN）全部写入 Subject + Keywords，便于分类检索
         if issue.resource_type == 1:  # 期刊
-            bits = [f"期刊：{issue.resource_name}", f"出版：{issue.pub_date}"]
-            if issue.publisher:
-                bits.append(f"出版社：{issue.publisher}")
+            bits = [f"期刊：{issue.resource_name}"]
+            code = issue.issn
         else:  # 图书
-            bits = [f"图书：{issue.resource_name}", f"出版：{issue.pub_date}"]
-            if issue.author:
-                bits.append(f"作者：{issue.author}")
+            bits = [f"图书：{issue.resource_name}"]
+            code = issue.isbn
+        if issue.author:
+            bits.append(f"作者：{issue.author}")
+        if issue.publisher:
+            bits.append(f"出版社：{issue.publisher}")
+        if issue.pub_date:
+            bits.append(f"出版：{issue.pub_date}")
+        if code:
+            bits.append(f"{'ISSN' if issue.resource_type == 1 else 'ISBN'}：{code}")
+        if issue.issue_name:
+            bits.append(f"期次：{issue.issue_name}")
         if issue.description:
             bits.append(issue.description[:200])
-        subject = " · ".join(x for x in bits if x)
+        subject = " · ".join(bits)
+        keywords = "bookan"
+        for kw in (issue.issue_name, code):
+            if kw:
+                keywords += f", {kw}"
         writer.add_metadata(
             {
                 "/Title": issue.display_title,
@@ -176,8 +193,57 @@ def _set_metadata(writer, issue: IssueInfo) -> None:
                 "/Producer": "BookanTool",
                 "/Creator": "BookanTool (img2pdf + pypdf)",
                 "/Subject": subject,
-                "/Keywords": f"bookan, {issue.issue_name}",
+                "/Keywords": keywords,
             }
         )
+        _set_xmp_metadata(writer, issue, author)
     except Exception:
         pass
+
+
+def _clean_isbn(raw: str) -> str:
+    """
+    接口 ISBN 形如 "9787557003784.1"（书号.变体号）。
+    去掉变体号后仅保留纯 10/13 位数字，否则 Calibre 的 check_isbn 会拒绝识别。
+    """
+    base = (raw or "").split(".")[0].replace("-", "").strip()
+    return base if (len(base) in (10, 13) and base.isdigit()) else ""
+
+
+def _set_xmp_metadata(writer, issue: IssueInfo, author: str) -> None:
+    """
+    写 XMP 元数据流（与 Info 字典并存）。
+
+    PDF Info 字典没有出版社/出版日期/ISBN 的专用槽位，Calibre 把塞进
+    Subject/Keywords 的内容一律当标签；而 Calibre 读取 PDF 时优先解析 XMP
+    （calibre/ebooks/metadata/xmp.py metadata_from_xmp_packet）：
+      dc:publisher → 出版社    dc:date → 出版日期
+      dc:identifier → ISBN 标识符（check_isbn 校验）
+      dc:description → 评论    dc:subject → 标签
+    """
+    xmp = XmpInformation.create()
+    xmp.dc_title = {"x-default": issue.display_title}
+    xmp.dc_creator = [author]
+
+    if issue.publisher:
+        xmp.dc_publisher = [issue.publisher]
+    if issue.pub_date:
+        with contextlib.suppress(ValueError):
+            xmp.dc_date = [datetime.fromisoformat(issue.pub_date)]
+
+    # 标签保持精简：类型 + 期次；ISBN 走 identifier，ISSN 无专用槽位只能放标签
+    tags = ["图书" if issue.resource_type != 1 else "期刊", "bookan"]
+    if issue.issue_name:
+        tags.append(issue.issue_name)
+    if issue.resource_type == 1 and issue.issn:
+        tags.append(issue.issn)
+    xmp.dc_subject = tags
+
+    if issue.description:
+        xmp.dc_description = {"x-default": issue.description[:800]}
+
+    isbn = _clean_isbn(issue.isbn)
+    if isbn:
+        xmp.dc_identifier = isbn
+
+    writer.xmp_metadata = xmp

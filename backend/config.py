@@ -11,7 +11,7 @@ import os
 import threading
 
 # ────────────── 应用信息 ──────────────
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.1"
 
 # ────────────── API 端点常量 ──────────────
 API_BASE = "https://api.bookan.com.cn"

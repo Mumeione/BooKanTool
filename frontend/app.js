@@ -108,7 +108,7 @@
         group.innerHTML = `
             <div class="input-row">
                 <input type="text" spellcheck="false"
-                       placeholder="URL 或 ID，如 https://new.bookan.com.cn/?type=1&id=233832 / 233832 / book:12345">
+                       placeholder="粘贴书刊链接，如 https://new.bookan.com.cn/?type=1&id=233832">
                 <button class="icon-btn del" title="删除本行" type="button">×</button>
             </div>
             <div class="row-sub">
@@ -162,10 +162,10 @@
         if (!window.pywebview || !window.pywebview.api) return;
         window.pywebview.api.resolve_input(text).then(r => {
             if (r.ok) {
-                // 精简展示：期刊 = 刊名 · 期数；图书 = 书名 · 作者
+                // 精简展示：期刊 = 刊名 · 期数；图书 = 书名 · 出版社（便于区分版本）
                 const label = r.resource_type === 1
                     ? `${r.resource_name} · ${r.issue_name || '未知期数'}`
-                    : `${r.resource_name} · ${r.author || r.publisher || '未知作者'}`;
+                    : `${r.resource_name} · ${r.publisher || '未知出版社'}`;
                 setChip(group, true, label);
                 group.dataset.rt = r.resource_type;
                 group.dataset.issueId = r.issue_id;
@@ -346,7 +346,7 @@
             compress_images: $('compress-images').checked,
             compress_level: Number($('compress-levels').dataset.active) || 1,
         };
-        if (!inputs.length) { log('warn', '请输入至少一条 URL/ID'); return; }
+        if (!inputs.length) { log('warn', '请输入至少一条书刊链接'); return; }
         if (!options.output_dir) {
             toggleSettingsPop(true);
             setStatus('warn', '请先选择输出目录');
@@ -438,10 +438,6 @@
 
     // ───────────── 下载完成界面 ─────────────
     $('btn-back').addEventListener('click', goMain);
-    $('btn-open-outdir').addEventListener('click', () => {
-        const dir = $('output-dir').value.trim();
-        if (dir) window.pywebview.api.open_in_explorer(dir);
-    });
 
     function renderDone(data) {
         const list = $('done-list');

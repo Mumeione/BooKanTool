@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import glob
 import os
+import shutil
 import tempfile
 import threading
 from collections.abc import Callable
@@ -14,7 +16,7 @@ from dataclasses import dataclass, field
 from .api import BookanAPI
 from .catalog import derive_page_offset
 from .catalog import to_tree as tree_chapters
-from .config import TEMP_DIR_PREFIX, sanitize_filename
+from .config import RESOURCE_TYPE_BOOK, TEMP_DIR_PREFIX, sanitize_filename
 from .epub_pipeline import EPUBPipeline
 from .image_pipeline import ImagePipeline
 from .models import IssueInfo
@@ -26,7 +28,7 @@ from .url_parser import ParseError, parse_input
 class JobSpec:
     """单条任务规格：用户输入解析后填充。"""
 
-    raw_input: str  # 原始输入（URL / ID）
+    raw_input: str  # 原始输入（书刊链接）
     resource_type: int  # 1 杂志 / 3 书籍
     issue_id: str
     output_format: str  # "pdf" / "epub"
@@ -46,6 +48,25 @@ class JobResult:
     ok: bool = False
     error: str = ""
     log_lines: list[str] = field(default_factory=list)
+
+
+def _cleanup_stale_temp() -> int:
+    """
+    清理历史遗留的临时缓存目录（bookan_tmp_*）。
+
+    下载全年期刊（24+ 本）时单本图片可达上百 MB，以下情形会留下孤儿目录：
+      • Windows 下文件被占用导致 TemporaryDirectory 自动清理静默失败
+      • 进程崩溃 / 强杀，with 块根本没机会退出
+    在每次批量任务开始时统一清扫，实现自愈。
+    返回删除的目录数。
+    """
+    stale = glob.glob(os.path.join(tempfile.gettempdir(), f"{TEMP_DIR_PREFIX}*"))
+    removed = 0
+    for d in stale:
+        shutil.rmtree(d, ignore_errors=True)
+        if not os.path.exists(d):
+            removed += 1
+    return removed
 
 
 def run_batch(
@@ -70,6 +91,11 @@ def run_batch(
     """
     results: list[JobResult] = []
     total = len(inputs)
+
+    # 批量开始前清扫上次遗留的临时缓存（多本连续下载易积攒，见函数 docstring）
+    stale = _cleanup_stale_temp()
+    if stale:
+        on_log(f"已清理上次遗留的下载缓存 {stale} 个目录")
 
     for idx, raw in enumerate(inputs, start=1):
         on_progress(idx, total, f"开始处理第 {idx}/{total} 条", 0.0)
@@ -114,7 +140,9 @@ def run_batch(
             on_progress(idx, total, label, max(0.0, min(1.0, fraction)))
 
         # 2. 单条流水线
-        with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp:
+        # ignore_cleanup_errors=True：Windows 下个别图片句柄未释放时清理失败不抛异常，
+        # 遗留目录由下一次任务开始的 _cleanup_stale_temp 兜底
+        with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX, ignore_cleanup_errors=True) as tmp:
             try:
                 _run_one(spec, api, tmp, on_log, cancel_event, result, report)
             except Exception as e:
@@ -210,8 +238,8 @@ def _run_pdf(
     img_pipeline = ImagePipeline(api)
 
     def prog(done, total_, page):
-        # 图片下载阶段占整体 5% ~ 65%
-        frac = 0.05 + 0.60 * (done / total_) if total_ else 0.05
+        # 图片下载是耗时主体：占整体 2% ~ 90%，收尾阶段压缩在最后 10%
+        frac = 0.02 + 0.88 * (done / total_) if total_ else 0.02
         report(frac, f"下载图片 {done}/{total_}（第 {page} 页）")
 
     img_result = img_pipeline.run(
@@ -231,19 +259,23 @@ def _run_pdf(
     chapters = []
     page_offset = 0
     if spec.add_bookmarks:
-        report(0.68, "获取目录结构…")
+        report(0.91, "获取目录结构…")
         chapters, page_offset = _fetch_chapters(issue, spec, api, img_result.page_numbers, on_log)
 
     # 封面说明：物理第 1 页即官方封面（与 EPUB 内 cover.jpg 同一文件），
     # 无需也不应再插入缩略图封面页。
 
-    # 输出文件名
-    issue.issue_name = issue.issue_name or issue.issue_id
-    fname = f"{sanitize_filename(issue.resource_name)}_{sanitize_filename(issue.issue_name)}.pdf"
+    # 输出文件名：期刊 = 刊名_期号；图书 = 书名_作者（实测 owner，缺失回退出版社）
+    if issue.resource_type == RESOURCE_TYPE_BOOK:
+        sub = issue.author or issue.publisher or issue.issue_id
+    else:
+        issue.issue_name = issue.issue_name or issue.issue_id
+        sub = issue.issue_name
+    fname = f"{sanitize_filename(issue.resource_name)}_{sanitize_filename(sub)}.pdf"
     output_path = os.path.join(spec.output_dir, fname)
 
     def phase(fraction: float, label: str):
-        # 合成阶段占整体 70% ~ 97%（见 build_pdf 的 phase 调用点）
+        # 合成阶段占整体 91% ~ 99%（见 build_pdf 的 phase 调用点）
         report(fraction, label)
 
     out = build_pdf(
@@ -280,8 +312,8 @@ def _run_epub(
     on_log(f"[{spec.issue_id}] 步骤 2: 直接下载官方 EPUB…")
 
     def prog(done: int, total: int, label: str):
-        # 下载字节进度占整体 10% ~ 98%
-        frac = 0.10 + 0.88 * (done / total) if total else 0.10
+        # EPUB 直下同为耗时主体：占整体 5% ~ 90%
+        frac = 0.05 + 0.85 * (done / total) if total else 0.05
         report(frac, f"下载 EPUB {label}")
 
     pipeline = EPUBPipeline(api)

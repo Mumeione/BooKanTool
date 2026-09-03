@@ -4,7 +4,7 @@
 字段名已按博看线上 API（api.bookan.com.cn）2026-08 实测返回校准：
   · issueInfoList 返回 resourceName / issueName / count / publish / press /
     issn / cn / isbn / text / jpg / webp / tags
-  · 接口**不返回** author 字段（杂志与书籍均无），相关展示需优雅降级
+  · 作者字段为 owner（type=3 图书实测返回，如 "曾仕强"）；杂志无作者信息
   · catalogInfo 返回 id / name / page / sublevels，page 可为 0 或负数（封面/目录/广告）
 """
 

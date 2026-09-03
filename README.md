@@ -6,17 +6,9 @@
 
 ## 📷 界面预览
 
-**主界面 —— 在这里粘贴书刊链接、选择导出格式**
-
-![主界面]<img src="assets/screenshots/main.png" width="40%">
-
-**下载中 —— 实时显示进度百分比，随时可以取消**
-
-![下载中]<img src="assets/screenshots/downloading.png" width="40%">
-
-**下载完成 —— 点击按钮即可打开文件所在的文件夹**
-
-![下载完成]<img src="assets/screenshots/done.png" width="40%"> 
+| **主界面 —— 粘贴书刊链接、选择导出格式** | **下载中 —— 实时显示进度，随时可以取消** | **下载完成 —— 点击按钮即可打开文件所在的文件夹** |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/main.png" width="100%"> | <img src="assets/screenshots/downloading.png" width="100%"> | <img src="assets/screenshots/done.png" width="100%"> |
 
 ---
 
@@ -67,4 +59,4 @@ EPUB 需要阅读软件支持，手机推荐「微信读书」导入，电脑可
 
 本项目以 [GPL-3.0](LICENSE) 协议开源。
 
-作者：**Mumei** · 版本 2.0.0 · 更新于 2026-09-01
+作者：**Mumei** · 版本 2.1.1 · 更新于 2026-09-04

@@ -253,14 +253,22 @@ def run_selftest() -> None:
 
     add("img2pdf 字节生成", t_img2pdf)
 
-    # ── pypdf：元数据 + outline 写读 ──
+    # ── pypdf：元数据（Info + XMP）+ outline 写读 ──
     def t_pypdf():
         from pypdf import PdfReader, PdfWriter
+        from pypdf.xmp import XmpInformation
 
         w = PdfWriter()
         w.add_blank_page(width=200, height=200)
         w.add_outline_item(title="chapter 1", page_number=0)
         w.add_metadata({"/Title": "selftest", "/Author": "test"})
+        xmp = XmpInformation.create()
+        xmp.dc_title = {"x-default": "selftest"}
+        xmp.dc_creator = ["tester"]
+        xmp.dc_publisher = ["pub"]
+        xmp.dc_subject = ["tag1", "tag2"]
+        xmp.dc_identifier = "9787557003784"
+        w.xmp_metadata = xmp
         out_buf = io.BytesIO()
         w.write(out_buf)
         out_buf.seek(0)
@@ -268,6 +276,11 @@ def run_selftest() -> None:
         assert len(r.pages) == 1
         assert len(r.outline) == 1
         assert r.metadata.title == "selftest"
+        x = r.xmp_metadata
+        assert x is not None, "XMP 元数据流缺失"
+        assert "selftest" in str(x.dc_title), f"XMP title 异常: {x.dc_title}"
+        assert x.dc_publisher == ["pub"], f"XMP publisher 异常: {x.dc_publisher}"
+        assert x.dc_identifier == "9787557003784", f"XMP identifier 异常: {x.dc_identifier}"
 
     add("pypdf 元数据 + outline 写读", t_pypdf)
 
@@ -311,9 +324,45 @@ def run_selftest() -> None:
         assert iss.description.startswith("本刊立足广东"), "description 应取自 text"
         assert iss.jpage_node == "8", "jpage_node 应取自 jpg"
         assert iss.tags == ["北大核心"], f"tags 解析异常: {iss.tags}"
-        assert iss.author == "", "接口无 author 字段，应保持空串"
+        assert iss.author == "", "杂志无 owner/author 字段，应保持空串"
+
+        # 图书 type=3：作者取 owner 字段（2026-09 实测）
+        book = _parse_issue(
+            {
+                "resourceId": "2552780",
+                "issueId": "310667698",
+                "resourceName": "曾仕强品三国",
+                "resourceType": 3,
+                "count": "161",
+                "owner": "曾仕强",
+                "press": "广东旅游出版社",
+                "publish": "2016-08-01",
+                "isbn": "9787557003784.1",
+            },
+            3,
+        )
+        assert book.author == "曾仕强", "图书作者应取自 owner 字段"
+        assert book.publisher == "广东旅游出版社", "publisher 应取自 press"
+        assert book.isbn == "9787557003784.1", "isbn 应原样映射"
 
     add("API 字段映射 (press/publish/text/jpg)", t_issue_mapping)
+
+    # ── URL 解析：官网 / 移动端分享（纯 ID 已不支持） ──
+    def t_url_parse():
+        from backend.url_parser import ParseError, parse_input
+
+        assert parse_input("https://new.bookan.com.cn/?type=1&id=310823891") == (1, "310823891")
+        # 移动端分享链接：?id=130 是站点 ID，书刊信息在 fragment #/dt/{type}/{issueId}
+        assert parse_input("https://wk6.bookan.com.cn/?id=130#/dt/1/310823891") == (1, "310823891")
+        assert parse_input("https://wk6.bookan.com.cn/?id=130#/dt/3/310577420") == (3, "310577420")
+        try:
+            parse_input("310823891")
+        except ParseError:
+            pass
+        else:
+            raise AssertionError("纯 ID 已不支持，应解析失败")
+
+    add("URL 解析 (官网/分享链接)", t_url_parse)
 
     # ── catalogInfo 两级结构 + page<=0 伪条目过滤 ──
     def t_catalog_tree():

@@ -12,6 +12,11 @@ dist/
 # 运行日志
 *.log
 
+# 安卓签名与产物（仅本地/android 分支使用，禁止入库）
+android/
+bin/
+devtools/DEVLOG.local.md
+
 # IDE / 系统
 .vscode/
 .idea/

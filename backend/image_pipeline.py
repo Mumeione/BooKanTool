@@ -4,7 +4,8 @@
   1. jpage 自动探测（解决部分资源走 CDN 节点不同的问题）
   2. 进度回调：每张图片下载完后回调 on_progress(done, total, page)
   3. 取消支持：通过 threading.Event 取消未下载完的任务
-  4. 可选压缩：三档（轻度/中度/高度），JPEG 重编码 + 限制最大宽度
+  4. 可选压缩：三档（轻度/中度/高度），JPEG 重编码 + 限制最大宽度；
+     压缩阶段多线程并行处理（PIL 解码/重采样/编码均释放 GIL，多核线性提速）
 """
 
 from __future__ import annotations
@@ -242,26 +243,45 @@ class ImagePipeline:
         return sorted_pairs, done[0] - failed[0], failed[0]
 
 
-def _compress_pages(paths: list[str], on_log: Callable[[str], None], level: int = 1) -> list[str]:
+def _compress_one(path: str, level: int = 1) -> tuple[str | None, int, int]:
     """
-    按档位重编码页面为 JPEG，并在超过该档最大宽度时等比缩小。
-    单页失败不影响整体（保留原文件）。
+    单页按档位重编码为 JPEG，并在超过该档最大宽度时等比缩小。
+    返回 (失败信息或 None, 压缩前字节数, 压缩后字节数)。各线程写不同文件，无冲突。
     """
     cfg = COMPRESSION_LEVELS.get(level, COMPRESSION_LEVELS[1])
     quality, max_width = cfg["quality"], cfg["max_width"]
-    for path in paths:
-        try:
-            with Image.open(path) as img:
-                img.load()
-                w, h = img.size
-                if max_width and w > max_width:
-                    new_h = round(h * max_width / w)
-                    img = img.resize((max_width, new_h), Image.LANCZOS)
-                if img.mode != "RGB":
-                    img = img.convert("RGB")
-                img.save(path, "JPEG", quality=quality, optimize=True)
-        except Exception as e:
-            on_log(f"  压缩失败，保留原图: {os.path.basename(path)} ({e})")
+    try:
+        before = os.path.getsize(path)
+        with Image.open(path) as img:
+            img.load()
+            w, h = img.size
+            if max_width and w > max_width:
+                new_h = round(h * max_width / w)
+                img = img.resize((max_width, new_h), Image.LANCZOS)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.save(path, "JPEG", quality=quality, optimize=True)
+        return None, before, os.path.getsize(path)
+    except Exception as e:
+        return f"  压缩失败，保留原图: {os.path.basename(path)} ({e})", 0, 0
+
+
+def _compress_pages(paths: list[str], on_log: Callable[[str], None], level: int = 1) -> list[str]:
+    """
+    批量按档位重编码页面（单页失败不影响整体，保留原文件）。
+    多线程并行：PIL 的 JPEG 解码/重采样/编码均释放 GIL，多核下接近线性提速。
+    """
+    workers = min(4, (os.cpu_count() or 1), len(paths) or 1)
+    if workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for msg, _, _ in pool.map(lambda p: _compress_one(p, level), paths):
+                if msg:
+                    on_log(msg)
+    else:
+        for path in paths:
+            msg, _, _ = _compress_one(path, level)
+            if msg:
+                on_log(msg)
     return paths
 
 

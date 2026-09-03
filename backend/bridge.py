@@ -102,7 +102,7 @@ class BridgeAPI:
         """
         解析输入并拉取资源信息，供前端精简预览：
           • 期刊(type=1)：刊名 + 期数（issueName）
-          • 图书(type=3)：书名 + 作者（接口常为空 → 回退出版社）
+          • 图书(type=3)：书名 + 作者（owner 字段）/ 出版社（供前端区分版本）
         """
         try:
             rt, iid = parse_input(text)
@@ -161,7 +161,7 @@ class BridgeAPI:
     def start_task(self, payload: dict) -> dict:
         """
         payload:
-            inputs: List[str]   —— 多行文本，每条一个 URL/ID
+            inputs: List[str]   —— 多行文本，每条一个书刊链接
             options: dict       —— 见 batch.run_batch
         返回: {"task_id": "..."}
         """

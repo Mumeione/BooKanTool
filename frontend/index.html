@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BookanTool · 博看书刊下载</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="brand">
+                <img class="logo-img" src="logo.png" alt="" width="30" height="30">
+                <h1>BookanTool</h1>
+            </div>
+            <div class="header-status" id="header-status">
+                <span class="dot idle"></span><span id="connection">正在握手后端...</span>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- ① 主界面：输入 + 导出选项 + 开始 -->
+            <section class="screen active" id="screen-main">
+                <div class="sec-title"><span class="step-num">1</span>输入书刊链接</div>
+                <div class="input-rows" id="input-rows"></div>
+                <button class="add-row" id="btn-add-input" type="button">＋ 添加一行</button>
+
+                <div class="sec-title"><span class="step-num">2</span>导出选项</div>
+                <div class="format-slider" id="format-slider" data-active="auto">
+                    <div class="slider-thumb" aria-hidden="true"></div>
+                    <button class="seg" data-format="auto" type="button">自动</button>
+                    <button class="seg" data-format="pdf" type="button">PDF</button>
+                    <button class="seg" data-format="epub" type="button">EPUB</button>
+                </div>
+                <div class="note-row">
+                    <span class="format-note" id="format-note">优先 EPUB，无 EPUB 版本选择 PDF</span>
+                    <button class="icon-btn tiny" id="btn-note-toggle" type="button" title="显示 / 隐藏说明">?</button>
+                </div>
+
+                <div class="pdf-options" id="pdf-options">
+                    <label class="check"><input type="checkbox" id="compress-images"><span>压缩图片</span></label>
+                    <div class="level-slider hidden" id="compress-levels" data-active="1">
+                        <div class="slider-thumb" aria-hidden="true"></div>
+                        <button class="seg" data-level="1" type="button" title="JPEG 质量 85 · 宽≤1600 · 体积约 60%">轻度</button>
+                        <button class="seg" data-level="2" type="button" title="JPEG 质量 75 · 宽≤1280 · 体积约 40%">中度</button>
+                        <button class="seg" data-level="3" type="button" title="JPEG 质量 60 · 宽≤1000 · 体积约 25%">高度</button>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-primary compact" id="btn-start" type="button" disabled>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        开始下载
+                    </button>
+                    <button class="icon-btn gear" id="btn-settings" type="button" title="设置">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
+
+                    <!-- 设置二级菜单 -->
+                    <div class="settings-pop hidden" id="settings-pop">
+                        <div class="pop-sec" id="sec-output-dir">
+                            <div class="pop-label">下载目录</div>
+                            <div class="output-dir" id="output-dir-row">
+                                <input type="text" id="output-dir" placeholder="点击右侧选择目录…" spellcheck="false">
+                                <button class="btn-secondary small" id="btn-choose-dir" type="button">选择…</button>
+                            </div>
+                        </div>
+                        <div class="pop-sec">
+                            <div class="pop-label">书签</div>
+                            <label class="check"><input type="checkbox" id="add-bookmarks" checked><span>添加章节书签（栏目→文章）</span></label>
+                        </div>
+                        <div class="pop-row">
+                            <button class="pop-item" id="btn-help" type="button">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                使用说明
+                            </button>
+                            <button class="pop-item" id="btn-open-log" type="button">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                                运行日志
+                            </button>
+                            <button class="pop-item" id="btn-about" type="button">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                关于
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ② 进度界面 -->
+            <section class="screen" id="screen-progress">
+                <div class="prog-head">
+                    <div class="prog-label" id="progress-label">准备中…</div>
+                    <div class="prog-percent" id="progress-percent">0%</div>
+                </div>
+                <div class="progress-bar big"><div id="progress-fill" class="fill"></div></div>
+                <div class="prog-meta" id="progress-meta"></div>
+                <div class="prog-foot">
+                    <button class="btn-danger" id="btn-cancel" type="button">取消下载</button>
+                </div>
+            </section>
+
+            <!-- ③ 下载完成界面 -->
+            <section class="screen" id="screen-done">
+                <div class="done-head">
+                    <div class="done-icon ok" id="done-icon">
+                        <svg class="ic-ok" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <svg class="ic-err" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="4.5" x2="12" y2="14"/><line x1="12" y1="18.5" x2="12" y2="19.5"/></svg>
+                    </div>
+                    <div class="done-title" id="done-title">下载完成</div>
+                    <div class="done-sub" id="done-sub"></div>
+                </div>
+                <div class="done-list" id="done-list"></div>
+                <div class="done-foot">
+                    <button class="btn-primary compact" id="btn-back" type="button">返回主界面</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- 日志弹窗（设置 → 运行日志） -->
+        <div class="modal-overlay hidden" id="log-modal">
+            <div class="modal log-modal">
+                <div class="modal-head">
+                    <span>运行日志</span>
+                    <button class="icon-btn tiny" id="btn-close-log" type="button" title="关闭">×</button>
+                </div>
+                <div class="log-box" id="log-box"></div>
+                <div class="modal-foot">
+                    <button class="btn-secondary small" id="btn-clear-log" type="button">清空</button>
+                    <button class="btn-secondary small" id="btn-copy-log" type="button">复制</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 取消确认对话框 -->
+        <div class="modal-overlay hidden" id="confirm-modal">
+            <div class="modal confirm-modal">
+                <div class="modal-head"><span>取消下载</span></div>
+                <p class="confirm-text">确定要取消当前下载任务吗？</p>
+                <div class="modal-foot">
+                    <button class="btn-secondary small" id="btn-cancel-no" type="button">继续下载</button>
+                    <button class="btn-danger small" id="btn-cancel-yes" type="button">确定取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 使用说明弹窗（设置 → 使用说明） -->
+        <div class="modal-overlay hidden" id="help-modal">
+            <div class="modal help-modal">
+                <div class="modal-head">
+                    <span>使用说明</span>
+                    <button class="icon-btn tiny" id="btn-close-help" type="button" title="关闭">×</button>
+                </div>
+                <div class="help-body">
+                    <p><b>保存位置</b>：安卓为系统下载目录的 Download/bookantool 文件夹</p>
+                    <p><b>支持链接</b>：博看官网 new.bookan.com.cn 及移动端分享链接（期刊 / 图书）</p>
+                    <p><b>主要功能</b>：批量下载书刊，导出官方 EPUB 或图片版 PDF（可压缩、加章节书签），期刊支持一键下载全年</p>
+                    <p><b>提示</b>：仅供技术研究，请尊重版权、禁止商用</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 关于弹窗（设置 → 关于） -->
+        <div class="modal-overlay hidden" id="about-modal">
+            <div class="modal about-modal">
+                <div class="modal-head">
+                    <span>关于软件</span>
+                    <button class="icon-btn tiny" id="btn-close-about" type="button" title="关闭">×</button>
+                </div>
+                <div class="about-body">
+                    <div class="about-brand">
+                        <img class="logo-img" src="logo.png" alt="" width="36" height="36">
+                        <div>
+                            <div class="about-name">BookanTool</div>
+                            <div class="about-ver" id="about-version"></div>
+                        </div>
+                    </div>
+                    <div class="about-item">
+                        <span class="about-k">作者</span>
+                        <span class="about-v">Mumei</span>
+                    </div>
+                    <div class="about-item">
+                        <span class="about-k">开源协议</span>
+                        <span class="about-v">GPL-3.0</span>
+                    </div>
+                    <div class="about-item">
+                        <span class="about-k">项目地址</span>
+                        <span class="about-v">github.com/Mumeione/BooKanTool</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+[project]
+name = "bookan-tool"
+version = "1.0.0"
+description = "博看书刊下载与导出工具（图片版 PDF / 官方 EPUB）"
+requires-python = ">=3.10"
+
+# ────────────── Ruff：Lint + Format ──────────────
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [".tools", "build", "dist", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle 错误
+    "W",   # pycodestyle 警告
+    "F",   # pyflakes（未使用导入/变量、f-string 问题等）
+    "I",   # isort 导入排序
+    "B",   # flake8-bugbear 常见陷阱
+    "UP",  # pyupgrade 现代语法
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # 行长交给 format 处理
+    "SIM108", # 三元替换 if-else 不一定更清晰
+]
+
+# devtools/ 为一次性探测与端到端调试脚本：
+# E402（sys.path 操作后再 import backend）是刻意的；其余风格问题不做门禁
+[tool.ruff.lint.per-file-ignores]
+"devtools/*" = ["E", "W", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

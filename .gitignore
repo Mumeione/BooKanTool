@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# 本地工具链（Ruff 安装在项目内）
+.tools/
+
+# 构建产物（PyInstaller 工作目录与输出）
+build/
+dist/
+
+# 安卓构建产物与本地缓存（APK 输出、临时目录、下载缓存）
+bin/
+tmp/
+*.apk
+downloads/
+.ruff_cache/
+
+# release 签名密钥（防冒签，严禁入库；换机器构建需手动补齐这两个文件）
+android/*.keystore
+android/release_keystore.properties
+
+# 本地开发日志（内部调试记录，不适合公开）
+*.local.md
+
+# 运行日志
+*.log
+
+# IDE / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

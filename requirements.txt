@@ -1,0 +1,13 @@
+# GUI
+pywebview>=6.2.1
+# 网络
+requests>=2.34.2
+# 进度友好
+tqdm>=4.70.0
+
+# 图片版 PDF
+img2pdf>=0.6.3
+pypdf>=6.16.2     # 写 outline / 加 metadata
+
+# 图片处理（可选：宽图分页用）
+Pillow>=12.3.0

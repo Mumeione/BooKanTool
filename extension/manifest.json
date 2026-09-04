@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "BookanTool — 博看书刊下载",
+  "version": "1.0.0",
+  "description": "在博看官网书刊详情页一键下载 PDF / EPUB，支持章节书签、图片压缩与全年批量下载。",
+  "author": "Mumei",
+  "homepage_url": "https://github.com/Mumeione/BooKanTool",
+  "minimum_chrome_version": "110",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["downloads", "storage", "tabs"],
+  "host_permissions": ["*://*.bookan.com.cn/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "BookanTool",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.bookan.com.cn/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

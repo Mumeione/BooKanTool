@@ -2,8 +2,12 @@
 __pycache__/
 *.py[cod]
 
-# 本地工具链（Ruff 安装在项目内）
+# 本地工具链（Node / Ruff 安装在项目内）
 .tools/
+.ruff_cache/
+
+# 运行输出（本地测试下载产物）
+downloads/
 
 # 构建产物（PyInstaller 工作目录与输出）
 build/
@@ -16,6 +20,9 @@ dist/
 android/
 bin/
 devtools/DEVLOG.local.md
+
+# 扩展 crx 私钥（泄露=他人可签发同 ID 更新，丢失=扩展 ID 变化，仅本地保存）
+extension.pem
 
 # IDE / 系统
 .vscode/

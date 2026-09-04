@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../icons/icon48.png" alt="">
+    <div>
+      <div class="name">BookanTool</div>
+      <div class="ver" id="ver"></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 下载目录（下载目录模式：只读说明 + 打开目录） -->
+    <section class="item">
+      <button class="head" data-toggle="sec-dir" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span>下载目录</span>
+        <i class="arrow">▾</i>
+      </button>
+      <div class="body" id="sec-dir">
+        <p class="desc">文件保存在<b>浏览器默认下载目录</b>下的 <code>bookantool/</code> 文件夹中，扩展不提供自定义路径。</p>
+        <button class="ghost" id="btn-open-dir" type="button">打开下载目录</button>
+      </div>
+    </section>
+
+    <!-- 章节书签 -->
+    <section class="item">
+      <div class="head static">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span>章节书签（PDF）</span>
+        <label class="switch"><input type="checkbox" id="bookmarks"><i></i></label>
+      </div>
+    </section>
+
+    <!-- 使用说明 -->
+    <section class="item">
+      <button class="head" data-toggle="sec-help" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>使用说明</span>
+        <i class="arrow">▾</i>
+      </button>
+      <div class="body" id="sec-help">
+        <ol>
+          <li>打开博看官网的书刊详情页，页面会出现「下载」按钮（在试读按钮旁边）。</li>
+          <li>点击「下载」，在弹出菜单中选择输出格式（自动 / PDF / EPUB）、是否压缩图片；杂志类可勾选「下载全年」。</li>
+          <li>确认后自动开始下载，页面右侧出现悬浮进度方块，点击可查看详情或取消。</li>
+        </ol>
+        <p class="desc">· <b>自动</b>：优先官方 EPUB（文字版、体积小），无 EPUB 时自动改用 PDF（图片版、排版一致）<br>
+        · 文件保存在浏览器<b>默认下载目录</b>的 <code>bookantool/</code> 文件夹<br>
+        · 批量下载时建议在浏览器 设置→下载 中关闭<b>「下载开始时显示下载菜单」</b>（Edge）或<b>「下载时显示下载栏」</b>（Chrome），避免每完成一期弹出提示<br>
+        · 下载依赖固定的任务标签页，请勿手动关闭它<br>
+        · 偶发失败重试即可；反复失败可查看「运行日志」定位原因</p>
+      </div>
+    </section>
+
+    <!-- 关于 -->
+    <section class="item">
+      <button class="head" data-toggle="sec-about" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>关于</span>
+        <i class="arrow">▾</i>
+      </button>
+      <div class="body" id="sec-about">
+        <div class="kv"><span>作者</span><b>Mumei</b></div>
+        <div class="kv"><span>开源协议</span><b>GPL-3.0</b></div>
+        <div class="kv"><span>项目地址</span><b class="url">github.com/Mumeione/BooKanTool</b></div>
+        <p class="desc">仅供技术研究 · 尊重版权 · 禁止商用</p>
+      </div>
+    </section>
+
+    <!-- 运行日志 -->
+    <section class="item">
+      <button class="head" data-toggle="sec-log" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span>运行日志</span>
+        <i class="arrow">▾</i>
+      </button>
+      <div class="body" id="sec-log">
+        <div class="logbox" id="logbox"></div>
+        <div class="row">
+          <button class="ghost sm" id="btn-clear-log" type="button">清空</button>
+          <span class="hint">仅保留最近 200 条</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+* { box-sizing: border-box; } /* 修复 .head width:100%+padding 溢出导致右侧开关被裁半 */
+
+body {
+  width: 350px;
+  margin: 0;
+  font-family: "Microsoft YaHei", system-ui, sans-serif;
+  background: #f6f7fb;
+  color: #333;
+  font-size: 13px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  /* 浅蓝紫渐变主题色（与 frontend/style.css --primary-grad 一致） */
+  background: linear-gradient(135deg, #6e9be0, #a68cd9);
+  color: #fff;
+}
+header img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+}
+header .name { font-size: 15px; font-weight: 700; }
+header .ver { font-size: 11px; opacity: 0.85; }
+
+main { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+.item {
+  background: #fff;
+  border: 1px solid #e8eaf2;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 13px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: #2c3350;
+  cursor: pointer;
+  text-align: left;
+}
+.head.static { cursor: default; }
+.head svg { color: #7b87a8; flex: none; }
+.head .arrow {
+  margin-left: auto;
+  color: #b6bac9;
+  font-size: 11px;
+  font-style: normal;
+  transition: transform 0.15s;
+}
+.item.open .head .arrow { transform: rotate(180deg); }
+
+.body {
+  display: none;
+  padding: 2px 14px 12px 36px;
+  border-top: 1px solid #f0f2f8;
+}
+.item.open .body { display: block; }
+
+.desc { font-size: 12px; color: #6b7186; line-height: 1.7; margin: 8px 0; }
+.desc code {
+  background: #eef1f7;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+.desc b { color: #3b76f6; }
+
+.ghost {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #d9dde8;
+  border-radius: 7px;
+  background: #fff;
+  color: #4a5578;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ghost:hover { border-color: #3b76f6; color: #3b76f6; }
+.ghost.sm { height: 24px; padding: 0 10px; }
+
+.body ol { margin: 8px 0; padding-left: 18px; }
+.body ol li { font-size: 12px; color: #5a6280; line-height: 1.8; }
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 12px;
+}
+.kv span { color: #8a8fa3; }
+.kv b { color: #2c3350; font-weight: 600; text-align: right; }
+.kv .url { word-break: break-all; }
+/* 关于页尾注：右对齐 */
+#sec-about .desc { text-align: right; }
+
+.switch { margin-left: auto; position: relative; display: inline-block; }
+.switch input { display: none; }
+.switch i {
+  display: block;
+  width: 34px;
+  height: 19px;
+  background: #d5d9e5;
+  border-radius: 10px;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.switch i::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.switch input:checked + i { background: #3b76f6; }
+.switch input:checked + i::after { left: 17px; }
+
+.logbox {
+  height: 150px;
+  overflow-y: auto;
+  background: #161a26;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: 10.5px/1.6 Consolas, monospace;
+  color: #a8b3c9;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 8px 0;
+}
+.logbox .err { color: #ff7b72; }
+.logbox .empty { color: #5a6280; }
+
+/* 运行日志二级页：去左缩进居中铺满，高度约占面板 90%（弹窗上限 600px） */
+#sec-log.body { padding: 2px 12px 12px; }
+#sec-log .logbox {
+  height: 200px;
+  width: 100%;
+  margin: 8px auto;
+  display: flex;
+  flex-direction: column;
+}
+#sec-log .logbox .empty {
+  margin: auto; /* 空态在日志框内水平垂直居中 */
+  text-align: center;
+}
+
+.row { display: flex; align-items: center; gap: 8px; }
+.hint { font-size: 10px; color: #b6bac9; }
